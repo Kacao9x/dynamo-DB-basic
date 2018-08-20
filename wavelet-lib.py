@@ -22,7 +22,7 @@ from scipy.interpolate import interp1d
 def retrieve_dat_files_in_folder_as_dataframe():
     address = th.ui.getdir('Pick your directory')# prompts user to select folder
     file_name = pd.DataFrame()
-    tC = []
+    global tC
     for filename in glob.glob(os.path.join(address, "*.dat")):
         my_file = open(filename)
         y_str = my_file.read()
@@ -38,7 +38,7 @@ def retrieve_dat_files_in_folder_as_dataframe():
 
         data = pd.DataFrame(data)
         file_name = pd.concat([file_name, data], axis=1, ignore_index=True)
-    return file_name
+    return file_name, tC
 
 
 # Reads all csv files from specified path(addr), returns data in files
@@ -230,8 +230,8 @@ def select_frequencies(wav_trsfrm, w, band, high, delta_t, freq1, freq2=1):
 
     if band:
         scl1, scl2 = get_scales_bandpass(freq1, freq2, delta_t)
-        print(scl1)
-        print(scl2)
+        # print(scl1)
+        # print(scl2)
         if scl1 <= w and scl2 <= w:
             wav_trsfrm = wav_trsfrm[int(scl2) : int(scl1), :]
             wav_trsfrm = np.pad(wav_trsfrm, ((scl2, abs(w-scl1)), (0, 0)), 'constant')
@@ -267,19 +267,21 @@ def _upsample(s, n, phase=0):
     return np.roll(np.kron(s, np.r_[1, np.zeros(n-1)]), phase)
 
 
-def interp(s, r, l=4, alpha=0.5):
-    """Interpolation - increase sampling rate by integer factor r. Interpolation
+"""Interpolation - increase sampling rate by integer factor r. Interpolation
     increases the original sampling rate for a sequence to a higher rate. interp
     performs lowpass interpolation by inserting zeros into the original sequence
-    and then applying a special lowpass filter. l specifies the filter length
-    and alpha the cut-off frequency. The length of the FIR lowpass interpolating
-    filter is 2*l*r+1. The number of original sample values used for
-    interpolation is 2*l. Ordinarily, l should be less than or equal to 10. The
-    original signal is assumed to be band limited with normalized cutoff
-    frequency 0=alpha=1, where 1 is half the original sampling frequency (the
-    Nyquist frequency). The default value for l is 4 and the default value for
+    and then applying a special lowpass filter. 
+    l specifies the filter length and alpha the cut-off frequency. 
+    The length of the FIR lowpass interpolating
+    filter is 2*l*r+1. 
+    The number of original sample values used for interpolation is 2*l. 
+    Ordinarily, l should be less than or equal to 10. The original signal is 
+    assumed to be band limited with normalized cutoff frequency 0=alpha=1, 
+    where 1 is half the original sampling frequency (the Nyquist frequency).
+    The default value for l is 4 and the default value for
     alpha is 0.5.
     """
+def interp(s, r, l=4, alpha=0.5):
     b = signal.firwin(2*l*r+1, alpha/r);
     a = 1
     return r*signal.lfilter(b, a, _upsample(s, r))[r*l+1:-1]
@@ -323,31 +325,98 @@ def remove_frequencies_and_save_to_csv(dtfrm, band_pass, high_pass,
         i = i + 1
 
     print("Select a folder")
-    path = th.ui.getdir('Select a directory to save the csv file')
+    path = th.ui.getdir('Select a directory to save the removed_freq csv')
     frame.to_csv(path + "/" + "freq-removed.csv")
+
+    return frame
+
+def find_max_peak( arr, p, echo2_max ):
+
+    ar = arr[:, 0:p]
+
+    return
 
 
 factor = 10
 fs = 7200000*factor
 dt = float( 1 / fs )
-retrievedData = retrieve_dat_files_in_folder_as_dataframe()
+tC = []
+retrievedData, tC = retrieve_dat_files_in_folder_as_dataframe()
 # row1 = list(retrievedData)
 # retrievedData = retrievedData.iloc[50:1000, :]
-remove_frequencies_and_save_to_csv(dtfrm = retrievedData, band_pass=True,
-                                   high_pass=False, high_freq_limit=3500000,
-                                   low_freq_limit=200000, width=100,
-                                   delta_t=3.47222222e-8)
+dtframe = retrievedData
+# dtframe = remove_frequencies_and_save_to_csv(dtfrm = retrievedData, band_pass=True,
+#                                    high_pass=False, high_freq_limit=3500000,
+#                                    low_freq_limit=200000, width=100,
+#                                    delta_t=3.47222222e-8)
 
 
 
-#extract the time from signal
+#interpolation signal
+
+col_data = pd.DataFrame()
+
+for column in dtframe:
+    interp_arr = (interp(dtframe[column], r=10, l=4, alpha=0.5))
+    interp_result = pd.DataFrame(interp_arr)
+    col_data = pd.concat([col_data, interp_result], axis=1, ignore_index=True)
+column = 0
+
+path = address = th.ui.getdir('Dir to save interpolation') + '/'
+col_data.to_csv(path + 'interpl_sorted_logs.csv')
+
+# Find peak echo and locate
 
 
-# file_name = pd.DataFrame()
-# for column in retrievedData:
-#     interp_arr = (interp(column, r=8, l=4, alpha=0.5))
-#     interp_result = pd.DataFrame(interp_arr)
-#     file_name = pd.concat([file_name, interp_result], axis=1, ignore_index=True)
+# 125 217
+col_data_echo_1 = col_data.iloc[500:1300, :]
+col_data_echo_2 = col_data.iloc[1400:2250, :]
+
+max_echo_1 = pd.DataFrame()
+max_echo_2 = pd.DataFrame()
+
+row_1, max_1 = [], []
+for col_idx, col in enumerate(col_data_echo_1):
+    row_1.append(col_data_echo_1[col_idx].idxmax())
+    mx = col_data_echo_1[col_idx].max()
+    max_1.append(mx)
+    # print ('value: %s' % str( mx ))
+    # print ('index: %s' % str(col_idx))
+    # print ('index: %s' % str(col_data_echo_1[col_idx].idxmax()))
+
+row_2, max_2 = [], []
+for col_idx, col in enumerate(col_data_echo_2):
+    row_2.append(col_data_echo_2[col_idx].idxmax())
+    mx = col_data_echo_2[col_idx].max()
+    max_2.append(mx)
+    # print ('value: %s' % str( mx ))
+    # print ('index: %s' % str(col_idx))
+    # print ('index: %s' % str(col_data_echo_2[col_idx].idxmax()))
+
+
+plt.figure(1)
+plt.plot(tC, max_1)
+plt.title('Echoes1_Temperature vs Amp')
+plt.interactive(True)
+plt.show()
+
+plt.figure(2)
+plt.plot(tC, row_1)
+plt.title('Echo1_Temperature and time of flight')
+plt.interactive(True)
+plt.show()
+
+plt.figure(3)
+plt.plot(tC, max_2)
+plt.title('Echoes2_Temperature vs Amp')
+plt.interactive(True)
+plt.show()
+
+plt.figure(4)
+plt.plot(tC, row_2)
+plt.title('Echo2_Temperature and time of flight')
+plt.interactive(False)
+plt.show()
 
 
 ##### run interpolate
