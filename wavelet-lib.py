@@ -342,20 +342,19 @@ fs = 7200000*factor
 dt = float( 1 / fs )
 tC = []
 retrievedData, tC = retrieve_dat_files_in_folder_as_dataframe()
+dtframe = retrievedData
+
 # row1 = list(retrievedData)
 # retrievedData = retrievedData.iloc[50:1000, :]
-dtframe = retrievedData
 # dtframe = remove_frequencies_and_save_to_csv(dtfrm = retrievedData, band_pass=True,
 #                                    high_pass=False, high_freq_limit=3500000,
 #                                    low_freq_limit=200000, width=100,
 #                                    delta_t=3.47222222e-8)
 
 
-
 #interpolation signal
 
 col_data = pd.DataFrame()
-
 for column in dtframe:
     interp_arr = (interp(dtframe[column], r=10, l=4, alpha=0.5))
     interp_result = pd.DataFrame(interp_arr)
@@ -364,13 +363,27 @@ column = 0
 
 path = address = th.ui.getdir('Dir to save interpolation') + '/'
 col_data.to_csv(path + 'interpl_sorted_logs.csv')
+# with open('Echoes-test-data/interpl_sorted_logs.csv') as outfile:
+#     col_data = pd.read_csv(outfile, sep=',', error_bad_lines=False)
+# outfile.close()
+
+
+#wavelet transform
+wvlet_trsf = pd.DataFrame()
+wvlet_trsf = remove_frequencies_and_save_to_csv(dtfrm = col_data, band_pass=True,
+                                   high_pass=False, high_freq_limit=3500000,
+                                   low_freq_limit=200000, width=100,
+                                   delta_t=1.38888889e-8)
+# with open('Echoes-test-data/freq-removed.csv') as outfile:
+#     wvlet_trsf = pd.read_csv(outfile, sep=',', error_bad_lines=False,skiprows=1)
+# outfile.close()
+
 
 # Find peak echo and locate
-
-
 # 125 217
-col_data_echo_1 = col_data.iloc[500:1300, :]
-col_data_echo_2 = col_data.iloc[1400:2250, :]
+
+col_data_echo_1 = wvlet_trsf.iloc[500:1300, :]
+col_data_echo_2 = wvlet_trsf.iloc[1400:2250, :]
 
 max_echo_1 = pd.DataFrame()
 max_echo_2 = pd.DataFrame()
@@ -394,29 +407,51 @@ for col_idx, col in enumerate(col_data_echo_2):
     # print ('index: %s' % str(col_data_echo_2[col_idx].idxmax()))
 
 
+#plot the data table
+[row, column] = wvlet_trsf.shape
 plt.figure(1)
-plt.plot(tC, max_1)
-plt.title('Echoes1_Temperature vs Amp')
+plt.title('SoC vs Time')
 plt.interactive(True)
+
+i = 1
+while i < column+1:
+    #plt.subplot(column/2, 2, i)
+    #change the integers inside this routine as (number of rows, number of columns, plotnumber)
+    plt.plot(wvlet_trsf.loc[:, i-1])
+    #plt.xlim((0, 0.00005))
+    i = i+1
+# plt_2.legend()
 plt.show()
 
-plt.figure(2)
-plt.plot(tC, row_1)
-plt.title('Echo1_Temperature and time of flight')
-plt.interactive(True)
-plt.show()
+j = 20
+while j < len(tC):
 
-plt.figure(3)
-plt.plot(tC, max_2)
-plt.title('Echoes2_Temperature vs Amp')
-plt.interactive(True)
-plt.show()
 
-plt.figure(4)
-plt.plot(tC, row_2)
-plt.title('Echo2_Temperature and time of flight')
-plt.interactive(False)
-plt.show()
+    plt.figure(2)
+    plt.scatter(tC, max_1)
+    plt.title('Echoes1_Temperature vs Amp')
+    plt.interactive(True)
+    plt.show()
+
+    plt.figure(3)
+    plt.scatter(tC, row_1)
+    plt.title('Echo1_Temperature and time of flight')
+    plt.interactive(True)
+    plt.show()
+
+    plt.figure(4)
+    plt.scatter(tC, max_2)
+    plt.title('Echoes2_Temperature vs Amp')
+    plt.interactive(True)
+    plt.show()
+
+    plt.figure(5)
+    plt.scatter(tC, row_2)
+    plt.title('Echo2_Temperature and time of flight')
+    plt.interactive(False)
+    plt.show()
+
+    j +=20
 
 
 ##### run interpolate
